@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.spatial.distance import cdist
 from numpy.random import multivariate_normal as nvm
-#hello GITHUB
+
 
 #DroneObject Class
 class DroneObject:
@@ -11,7 +11,12 @@ class DroneObject:
         self.VelocityVector = np.array([0, 0, 0]) #X Y Z position Vector
         self.PositionCovar =  (1e-12)*np.eye(3)
         self.PlannedPath = 0
+        self.ObservedRay = 0
         self.PathLog = 0
+
+    def retrieveRayVect(self, OtherDrone):
+        return OtherDrone.PathLog
+
 
 class SimulatorObject:
     def __init__(self, Drones):
@@ -50,11 +55,12 @@ class SimulatorObject:
             for drone in self.DroneArray:
                 if i < len(drone.PlannedPath):
                     rnd = self.addRandomNoise(drone, [0, 0, 0])
-                    
                     drone.PathLog[i] = drone.PlannedPath[i] + rnd
+
                 else:
                     rnd = self.addRandomNoise(drone, [0, 0, 0])
                     drone.PathLog[i] = drone.PlannedPath[len(drone.PlannedPath)-1] + rnd
+                
 
 
 if __name__ == "__main__":
