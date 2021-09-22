@@ -1,6 +1,8 @@
 import numpy as np
 from scipy.spatial.distance import cdist
 from numpy.random import multivariate_normal as nvm
+from sklearn.preprocessing import normalize
+from mpl_toolkits import mplot3d
 
 
 #DroneObject Class
@@ -13,9 +15,12 @@ class DroneObject:
         self.PlannedPath = 0
         self.ObservedRay = 0
         self.PathLog = 0
+        self.TruePathLog = 0
 
     def retrieveRayVect(self, OtherDrone):
-        return OtherDrone.PathLog
+        Obs = normalize(OtherDrone.TruePathLog- self.PathLog)
+        #Input Camera Model
+        return Obs
 
 
 class SimulatorObject:
@@ -23,6 +28,7 @@ class SimulatorObject:
         self.DroneArray = Drones
         self.deltaT = 1/10
         self.TimeLength = 13
+        self.TimeVect = 0
         
 
     def genLinearPath(self, DroneObj, P1, P2, Speed):
@@ -47,25 +53,70 @@ class SimulatorObject:
         TimeSteps = self.TimeLength * (1/self.deltaT)
         
         TimeVec = np.linspace(0,self.TimeLength,int(TimeSteps))
+        self.TimeVect = TimeVec
         for drone in self.DroneArray:
             drone.PathLog = np.zeros((int(TimeSteps), 3))
-            
+            drone.TruePathLog = np.zeros((int(TimeSteps), 3))
 
         for i, T in enumerate(TimeVec):
             for drone in self.DroneArray:
                 if i < len(drone.PlannedPath):
                     rnd = self.addRandomNoise(drone, [0, 0, 0])
+                    drone.TruePathLog[i] = drone.PlannedPath[i]
                     drone.PathLog[i] = drone.PlannedPath[i] + rnd
 
                 else:
                     rnd = self.addRandomNoise(drone, [0, 0, 0])
                     drone.PathLog[i] = drone.PlannedPath[len(drone.PlannedPath)-1] + rnd
+                    drone.TruePathLog[i] = drone.PlannedPath[len(drone.PlannedPath)-1] 
                 
+class LocalizerObject:
+    def __init__(self):
+        self.deltaT = 1/10
+        self.maxITER = 25
+        self.lr = 1e-2
+        self.EstimatedPath = 0
 
+
+    def Cam3DModel(self, Xmeas, Xray, Xpos):
+        Xm_mat = np.asmatrix(Xmeas).transpose()
+        Xr_mat = np.asmatrix(Xray).transpose()
+        Xo_mat = np.asmatrix(Xpos).transpose()
+        Num_Term = Xr_mat.transpose() @ (Xm_mat-Xo_mat)
+        Alph_Star = Num_Term / np.linalg.norm(Xray)**2
+       
+        Xout = Alph_Star[0,0] * Xray + Xpos
+        print(Xout)
+        return Xout
+
+        
+
+
+    def ResolveLocationCam(self, Observer, Target):
+        CamMeas = Observer.retrieveRayVect(Target)
+        RangeMeas = Target.PathLog
+        counter = 0
+        szMeas = np.shape(RangeMeas)
+        self.EstimatedPath = np.zeros(szMeas)
+        #go through array
+        for i,Point in enumerate(CamMeas):
+            
+            self.EstimatedPath[i,:] = self.Cam3DModel(RangeMeas[i,:], CamMeas[i,:], Observer.PathLog[i,:])
+           
+    def computeError(self, Meas,TruePath):
+        error = np.zeros((len(TruePath),1))
+        for i,Point in enumerate(TruePath):
+            error[i] = np.linalg.norm(Point - Meas[i,:])
+        return error
+
+    
 
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
-    fg, ax = plt.subplots(3,1)
+    fg, ax= plt.subplots(4,1)
+
+    fig = plt.figure()
+    axs = plt.axes(projection='3d')
     Invader =    DroneObject()
     Def1 =    DroneObject()
     Def2 =    DroneObject()
@@ -91,8 +142,10 @@ if __name__ == "__main__":
 
         #defender 1 Path
         
-        P1 = [0, 0,  0]
+        P1 = [0, 0,  0.0]
         P2 = [4,2, 2]
+
+        #P2 = [0,1,1]
         Speed = 0.75
 
         SimObj.genLinearPath(DroneList[1], P1, P2, Speed)
@@ -112,15 +165,57 @@ if __name__ == "__main__":
 
     SimObj.runSim()
 
+    Obs = Def1.retrieveRayVect(Invader)
+    Obs = Obs + Def1.PathLog
+    Obs_n = np.vstack((Def1.PathLog[15,:], Obs[15,:]))
 
-    X =  Invader.PathLog[:,0]
-    Y =  Invader.PathLog[:,1]
-    Z =  Invader.PathLog[:,2]
+    localizer = LocalizerObject()
+
+    localizer.ResolveLocationCam(Def1, Invader)
+
+    X1 =  Def1.PathLog[:,0]
+    Y1 =  Def1.PathLog[:,1]
+    Z1 =  Def1.PathLog[:,2]
+
+    X2 =  Def2.PathLog[:,0]
+    Y2 =  Def2.PathLog[:,1]
+    Z2 =  Def2.PathLog[:,2]
+
+    X3 =  Invader.PathLog[:,0]
+    Y3 =  Invader.PathLog[:,1]
+    Z3 =  Invader.PathLog[:,2]
+
+    X4 =  localizer.EstimatedPath[:,0] 
+    Y4 =  localizer.EstimatedPath[:,1] 
+    Z4 =  localizer.EstimatedPath[:,2] 
+
+
     
-    ax[0].plot(X)
-    ax[1].plot(Y)
-    ax[2].plot(Z)
 
+
+    axs.plot3D(X1,Y1,Z1)
+    axs.plot3D(X2,Y2,Z2)
+    axs.plot3D(X3,Y3,Z3)
+    axs.plot3D(X4,Y4,Z4)
+    
+    #axs.plot3D(Obs_n[:,0],Obs_n[:,1],Obs_n[:,2])
+
+    T = SimObj.TimeVect
+
+    ax[0].plot(T,X4)
+    ax[0].plot(T,X3)
+
+    ax[1].plot(T,Y4)
+    ax[1].plot(T,Y3)
+
+    ax[2].plot(T,Z4)
+    ax[2].plot(T,Z3)
+
+    e1 = localizer.computeError( localizer.EstimatedPath,Invader.TruePathLog)
+    e2 = localizer.computeError( Invader.PathLog, Invader.TruePathLog)
+
+    ax[3].plot(T,e1)
+    ax[3].plot(T,e2)
     plt.show()
 
 
