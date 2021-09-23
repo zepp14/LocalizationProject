@@ -18,7 +18,9 @@ class DroneObject:
         self.TruePathLog = 0
 
     def retrieveRayVect(self, OtherDrone):
-        Obs = normalize(OtherDrone.TruePathLog- self.PathLog)
+        rnd = [nvm([0, 0, 0], 1e-4*np.eye(3)) for i in  OtherDrone.TruePathLog]
+        
+        Obs = normalize(OtherDrone.TruePathLog +rnd - self.PathLog)
         #Input Camera Model
         return Obs
 
@@ -89,8 +91,46 @@ class LocalizerObject:
         print(Xout)
         return Xout
 
-        
+    def DualCam3DModel(self, Xmeas, Xray1, Xray2, Xpos1, Xpos2):
+        Xm_mat = np.asmatrix(Xmeas).transpose()
+        Xr1_mat = np.asmatrix(Xray1).transpose()
+        Xr2_mat = np.asmatrix(Xray2).transpose()
+        Xo1_mat = np.asmatrix(Xpos1).transpose()
+        Xo2_mat = np.asmatrix(Xpos2).transpose()
 
+        XR = np.concatenate((Xr1_mat,Xr2_mat),axis=1)
+        XO = np.concatenate((Xo1_mat,Xo2_mat),axis=1)
+        B  = np.matrix([-1, 1]).transpose()
+        
+        Term1 = XR.transpose() @ XR
+        Term2 = XR.transpose() @ XO
+        A = (np.linalg.inv(Term1) @ Term2) @ B
+        
+        
+        Alph_Star1 = A[0,0]
+        Alph_Star2 = -A[1,0]
+        
+        Xout1 = Alph_Star1 * Xray1 + Xpos1
+        Xout2 = Alph_Star2 * Xray2 + Xpos2
+
+        Meas = np.vstack((Xout1,Xout2))
+        Xout = np.mean(Meas,axis=0)
+        
+        print(Xout)
+        return Xout
+
+        
+    def ResolveLocationCam_Dual(self, Observer1, Observer2, Target):
+        CamMeas1 = Observer1.retrieveRayVect(Target)
+        CamMeas2 = Observer2.retrieveRayVect(Target)
+        RangeMeas = Target.PathLog
+        counter = 0
+        szMeas = np.shape(RangeMeas)
+        self.EstimatedPath = np.zeros(szMeas)
+        #go through array
+        for i,Point in enumerate(CamMeas1):
+            
+            self.EstimatedPath[i,:] = self.DualCam3DModel(RangeMeas[i,:], CamMeas1[i,:],CamMeas2[i,:], Observer1.PathLog[i,:],Observer2.PathLog[i,:])
 
     def ResolveLocationCam(self, Observer, Target):
         CamMeas = Observer.retrieveRayVect(Target)
@@ -161,6 +201,8 @@ if __name__ == "__main__":
 
 
     Invader.PositionCovar = (1e-2)*np.eye(3)
+    Def1.PositionCovar = (1e-3)*np.eye(3)
+    Def2.PositionCovar = (1e-3)*np.eye(3)
     GenPaths(SimObj, DroneList)
 
     SimObj.runSim()
@@ -171,7 +213,8 @@ if __name__ == "__main__":
 
     localizer = LocalizerObject()
 
-    localizer.ResolveLocationCam(Def1, Invader)
+    #localizer.ResolveLocationCam(Def1, Invader)
+    localizer.ResolveLocationCam_Dual(Def1,Def2, Invader)
 
     X1 =  Def1.PathLog[:,0]
     Y1 =  Def1.PathLog[:,1]
