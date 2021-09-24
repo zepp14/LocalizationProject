@@ -15,6 +15,8 @@ class DroneObject:
         self.PlannedPath = 0
         self.ObservedRay = 0
         self.PathLog = 0
+        self.TrueVelocityLog = 0
+        self.VelocityLog = 0
         self.TruePathLog = 0
 
     def retrieveRayVect(self, OtherDrone):
@@ -57,8 +59,10 @@ class SimulatorObject:
         TimeVec = np.linspace(0,self.TimeLength,int(TimeSteps))
         self.TimeVect = TimeVec
         for drone in self.DroneArray:
-            drone.PathLog = np.zeros((int(TimeSteps), 3))
+            drone.PathLog =     np.zeros((int(TimeSteps), 3))
             drone.TruePathLog = np.zeros((int(TimeSteps), 3))
+            drone.VelocityLog = np.zeros((int(TimeSteps), 3))
+            drone.TrueVelocityLog = np.zeros((int(TimeSteps), 3))
 
         for i, T in enumerate(TimeVec):
             for drone in self.DroneArray:
@@ -71,6 +75,10 @@ class SimulatorObject:
                     rnd = self.addRandomNoise(drone, [0, 0, 0])
                     drone.PathLog[i] = drone.PlannedPath[len(drone.PlannedPath)-1] + rnd
                     drone.TruePathLog[i] = drone.PlannedPath[len(drone.PlannedPath)-1] 
+
+                if i > 0:
+                    drone.TrueVelocityLog[i] = (drone.TruePathLog[i] - drone.TruePathLog[i-1]) / self.deltaT
+                    drone.VelocityLog[i] = (drone.PathLog[i] - drone.PathLog[i-1]) / self.deltaT  
                 
 class LocalizerObject:
     def __init__(self):
@@ -78,6 +86,7 @@ class LocalizerObject:
         self.maxITER = 25
         self.lr = 1e-2
         self.EstimatedPath = 0
+        self.EstimatedVelocity = 0
 
 
     def Cam3DModel(self, Xmeas, Xray, Xpos):
@@ -129,7 +138,7 @@ class LocalizerObject:
         self.EstimatedPath = np.zeros(szMeas)
         #go through array
         for i,Point in enumerate(CamMeas1):
-            
+
             self.EstimatedPath[i,:] = self.DualCam3DModel(RangeMeas[i,:], CamMeas1[i,:],CamMeas2[i,:], Observer1.PathLog[i,:],Observer2.PathLog[i,:])
 
     def ResolveLocationCam(self, Observer, Target):
@@ -201,8 +210,8 @@ if __name__ == "__main__":
 
 
     Invader.PositionCovar = (1e-2)*np.eye(3)
-    Def1.PositionCovar = (1e-3)*np.eye(3)
-    Def2.PositionCovar = (1e-3)*np.eye(3)
+    Def1.PositionCovar = (1e-7)*np.eye(3)
+    Def2.PositionCovar = (1e-7)*np.eye(3)
     GenPaths(SimObj, DroneList)
 
     SimObj.runSim()
@@ -233,7 +242,13 @@ if __name__ == "__main__":
     Z4 =  localizer.EstimatedPath[:,2] 
 
 
-    
+    VX1 = Def1.VelocityLog[:,0]
+    VY1 = Def1.VelocityLog[:,1]
+    VZ1 = Def1.VelocityLog[:,2]
+
+    VX2 = Invader.VelocityLog[:,0]
+    VY2 = Invader.VelocityLog[:,1]
+    VZ2 = Invader.VelocityLog[:,2]
 
 
     axs.plot3D(X1,Y1,Z1)
@@ -245,14 +260,23 @@ if __name__ == "__main__":
 
     T = SimObj.TimeVect
 
-    ax[0].plot(T,X4)
-    ax[0].plot(T,X3)
+    # ax[0].plot(T,X4)
+    # ax[0].plot(T,X3)
 
-    ax[1].plot(T,Y4)
-    ax[1].plot(T,Y3)
+    # ax[1].plot(T,Y4)
+    # ax[1].plot(T,Y3)
 
-    ax[2].plot(T,Z4)
-    ax[2].plot(T,Z3)
+    # ax[2].plot(T,Z4)
+    # ax[2].plot(T,Z3)
+
+    ax[0].plot(T,VX1)
+    ax[0].plot(T,VX2)
+
+    ax[1].plot(T,VY1)
+    ax[1].plot(T,VY2)
+
+    ax[2].plot(T,VZ1)
+    ax[2].plot(T,VZ2)
 
     e1 = localizer.computeError( localizer.EstimatedPath,Invader.TruePathLog)
     e2 = localizer.computeError( Invader.PathLog, Invader.TruePathLog)
