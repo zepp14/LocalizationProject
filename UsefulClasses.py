@@ -5,6 +5,37 @@ from sklearn.preprocessing import normalize
 from mpl_toolkits import mplot3d
 
 
+def normr(X):
+    x = np.asarray(X)
+    if x.ndim > 1:
+        A =  [P / np.linalg.norm(P) for P in X]
+    else:
+        A =  X / np.linalg.norm(X)
+    return A
+
+def Cart2Sphere(X):
+    #Convention [radius Azimuth Inclination]
+    x = X[0]
+    y = X[1]
+    z = X[2]
+
+    r = np.sqrt(x**2 + y**2 + z**2)
+    Theta =  np.arctan2(y,x)
+    Phi = np.arctan2(np.sqrt(x**2 + y**2),z) 
+    return [r, Theta, Phi]
+
+def Sphere2Cart(X):
+    #Convention [radius Azimuth Inclination]
+    r = X[0]
+    Theta = X[1]
+    Phi = X[2]
+    x = r*np.sin(Phi) * np.cos(Theta)
+    y = r*np.sin(Phi) * np.sin(Theta)
+    z = r*np.cos(Phi)
+
+    return [x, y, z]
+
+
 #DroneObject Class
 class DroneObject:
 
@@ -138,7 +169,6 @@ class LocalizerObject:
         self.EstimatedPath = np.zeros(szMeas)
         #go through array
         for i,Point in enumerate(CamMeas1):
-
             self.EstimatedPath[i,:] = self.DualCam3DModel(RangeMeas[i,:], CamMeas1[i,:],CamMeas2[i,:], Observer1.PathLog[i,:],Observer2.PathLog[i,:])
 
     def ResolveLocationCam(self, Observer, Target):
@@ -225,6 +255,10 @@ if __name__ == "__main__":
     #localizer.ResolveLocationCam(Def1, Invader)
     localizer.ResolveLocationCam_Dual(Def1,Def2, Invader)
 
+
+
+
+    ##Plot Data
     X1 =  Def1.PathLog[:,0]
     Y1 =  Def1.PathLog[:,1]
     Z1 =  Def1.PathLog[:,2]
@@ -260,6 +294,7 @@ if __name__ == "__main__":
 
     T = SimObj.TimeVect
 
+    
     # ax[0].plot(T,X4)
     # ax[0].plot(T,X3)
 
