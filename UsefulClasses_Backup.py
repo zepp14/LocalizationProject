@@ -359,8 +359,8 @@ if __name__ == "__main__":
     GenPaths(SimObj, DroneList)
 
     SimObj.runSim()
-    Def2.LogFreq = 1 #Hz
-    Invader.LogFreq = 0.00001  #Hz
+    Def2.LogFreq = 3 #Hz
+    Invader.LogFreq = 1  #Hz
     SimObj.applyDataIntermittence()
 
     SimObj.applyDataIntermittence()
@@ -421,9 +421,38 @@ if __name__ == "__main__":
             X0 = np.asmatrix(Def1_Obs[i-1,:])
             X1 = np.asmatrix(Def1_Obs[i,:])
 
-           
+            Pos_Array = np.vstack((X0,X1))
+
+            dY = localizer.g_Vel_Sph_model_obs(Pos_Array, SimObj.deltaT)
             
-            alph = np.linalg.norm(PositionEstimate[i-1] + Invader.TrueVelocityLog[i] * SimObj.deltaT  - Def1.PathLog[i])
+            dTh = dY[0]
+            dPh = dY[1]
+
+            #figure out dY due to relative motion
+            V_rel = Def1.VelocityLog[i]
+            PosEstInt = PositionEstimate[i-1] + V_rel * SimObj.deltaT
+            X1_mod = np.asmatrix(PosEstInt)
+
+            Pos_Array_rel = np.vstack((X0,X1_mod))
+
+            dY_rel = localizer.g_Vel_Sph_model_obs(Pos_Array_rel, SimObj.deltaT)
+
+            dTh_rel = dY_rel[0]
+            dPh_rel = dY_rel[1]
+
+            X0_sph = Cart2Sphere(X0)
+
+            X1_Th = X0_sph[1] + dTh * SimObj.deltaT + 1* dTh_rel * SimObj.deltaT 
+            X1_phi = X0_sph[2] + dPh * SimObj.deltaT + 1*dPh_rel * SimObj.deltaT 
+            #inject r
+            Xtru_sph = Cart2Sphere(np.asmatrix(Invader.TruePathLog[i]-Def1.PathLog[i]))
+
+            X1_sph = np.asmatrix([Xtru_sph[0] , X1_Th, X1_phi ])
+            #X1_sph = [np.linalg.norm(PositionEstimate[i-1]-Def1.PathLog[i]) , X1_Th, X1_phi ]
+            
+            Out = Sphere2Cart(X1_sph)
+            
+            alph = np.linalg.norm(Invader.TruePathLog[i]-Def1.PathLog[i])
             print(alph)
             PositionEstimate[i] = np.asmatrix(alph) @  normr(X1) + Def1.PathLog[i]
             
@@ -490,21 +519,21 @@ if __name__ == "__main__":
     ax[2].plot(T,Z3)
 
     fig1, axVel = plt.subplots(3,1)
-    fig1, axEr = plt.subplots()
-    axVel[0].plot(T,VX1)
+
+    axVel[0].scatter(T,VX1)
     axVel[0].plot(T,VX2)
 
-    axVel[1].plot(T,VY1)
+    axVel[1].scatter(T,VY1)
     axVel[1].plot(T,VY2)
 
-    axVel[2].plot(T,VZ1)
+    axVel[2].scatter(T,VZ1)
     axVel[2].plot(T,VZ2)
 
     e1 = localizer.computeError( PositionEstimate,Invader.TruePathLog)
     e2 = localizer.computeError( Invader.PathLog, Invader.TruePathLog)
 
-    axEr.plot(T,e1)
-    axEr.plot(T,e2)
+    ax[3].plot(T,e1)
+    ax[3].plot(T,e2)
     plt.show()
 
 
