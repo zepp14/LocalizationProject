@@ -63,8 +63,8 @@ def main():
     GenPaths(SimObj, DroneList)
 
     SimObj.runSim()
-    Def2.LogFreq = 1 #Hz
-    Invader.LogFreq = 0.00001  #Hz
+    Def2.LogFreq = 1/5 #Hz
+    Invader.LogFreq = 5 #Hz
     SimObj.applyDataIntermittence()
 
     SimObj.applyDataIntermittence()
@@ -105,7 +105,7 @@ def main():
         RangeFlag = Invader.AvailFlag[i]
 
         if (Def2Flag == 1 and RangeFlag == 1) or Def2Flag == 1:
-            VelocityEstimate[i] = Invader.VelocityLog[i+1]
+            VelocityEstimate[i] = Invader.TrueVelocityLog[i+1]
             PositionEstimate[i] = localizer.DualCam3DModel(RangeMeas[i,:], Def1_Obs[i,:], Def2_Obs[i,:], Def1.PathLog[i,:], Def2.PathLog[i,:])
 
         elif Def2Flag == 0 and RangeFlag == 1:
@@ -128,6 +128,7 @@ def main():
            
             
             alph = np.linalg.norm(PositionEstimate[i-1] + Invader.TrueVelocityLog[i] * SimObj.deltaT  - Def1.PathLog[i])
+            #alph = np.linalg.norm(PositionEstimate[i-1] + VelocityEstimate[i-1] * SimObj.deltaT  - Def1.PathLog[i])
             print(alph)
             PositionEstimate[i] = np.asmatrix(alph) @  normr(X1) + Def1.PathLog[i]
             

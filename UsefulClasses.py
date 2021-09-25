@@ -69,7 +69,7 @@ class DroneObject:
 class SimulatorObject:
     def __init__(self, Drones):
         self.DroneArray = Drones
-        self.deltaT = 1/20
+        self.deltaT = 1/10
         self.TimeLength = 13
         self.TimeVect = 0
         
@@ -140,7 +140,7 @@ class SimulatorObject:
                 
 class LocalizerObject:
     def __init__(self):
-        self.deltaT = 1/20
+        self.deltaT = 1/10
         self.maxITER = 25
         self.lr = 1e-2
         self.EstimatedPath = 0
