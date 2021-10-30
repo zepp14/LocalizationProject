@@ -63,8 +63,12 @@ def main():
     GenPaths(SimObj, DroneList)
 
     SimObj.runSim()
-    Def2.LogFreq = 1/5 #Hz
-    Invader.LogFreq = 5 #Hz
+    ####
+    Def2.LogFreq = 1 #Hz
+    Invader.LogFreq = 3 #Hz
+    ###
+
+
     SimObj.applyDataIntermittence()
 
     SimObj.applyDataIntermittence()
