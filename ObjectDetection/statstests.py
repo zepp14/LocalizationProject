@@ -7,73 +7,77 @@ import matplotlib.pyplot as plt
 
 
 class StatCompute(object):
-    def __init__(self, mu, covar):
+    def __init__(self, mu, covar, conf_lvl = 0.9):
         self.mu = mu
         self.covar = covar
         self.StatFunc = scs.multivariate_normal(mean=self.mu, cov=self.covar)
         self.MaxPVal = None
+        self.alphVal = (1.- conf_lvl)/2.
 
-        testPoint = np.array([1e-7, 1e-7])
+        testPoint = np.array([mu[0] + 1e-7, mu[1] + 1e-7])
         DiffVec = (testPoint - self.mu) / np.linalg.norm((testPoint -self.mu))
         scalar = np.linspace(0., 1., 300)
-        Array = [ testPoint + p*6.0* DiffVec   for p in scalar ]
+        Array = [ testPoint + p*6.0*self.covar[0,0]* DiffVec   for p in scalar ]
         stat = self.StatFunc.pdf(Array)
         self.MaxPVal = np.trapz(stat)
-        print(self.MaxPVal)
+        
 
     def computePseudoPValue(self, point):
         testPoint = point
         DiffVec = (testPoint - self.mu) / np.linalg.norm((testPoint -self.mu))
         scalar = np.linspace(0., 1., 300)
-        Array = [ testPoint + p*6.0* DiffVec   for p in scalar ]
+        Array = [ testPoint + p*6.0*np.sqrt(self.covar[0,0])* DiffVec   for p in scalar ]
         stat = self.StatFunc.pdf(Array)
-        return 1-(np.trapz(stat)/self.MaxPVal)
         
-    
-mu = [0,0]
-covar = 0.9*np.array([[1, 0],[0, 1]])
-sc = StatCompute(mu,covar)
-
-
-point = np.array([0.03,-0.03])
-out = sc.computePseudoPValue( point)
-print("output ", out)
+        return 1-(np.trapz(stat)/self.MaxPVal)
 
 
 
-rv = scs.multivariate_normal(mean=mu, cov=covar)
+if __name__ == "__main__":
+    mu = [0,0]
+    covar = 0.9*np.array([[20, 0],[0, 20]])
+    sc = StatCompute(mu,covar)
+
+
+    point = np.array([0.03,-0.03])
+    out = sc.computePseudoPValue( point)
+    print("output ", out)
 
 
 
-x = np.linspace(-3,3,100)
-y = np.linspace(-3,3,100)
-X = np.meshgrid(x )
-Y = np.meshgrid(y )
+    rv = scs.multivariate_normal(mean=mu, cov=covar)
 
 
 
-
-#max
-
-
-#Find outpoint
+    x = np.linspace(-3,3,100)
+    y = np.linspace(-3,3,100)
+    X = np.meshgrid(x )
+    Y = np.meshgrid(y )
 
 
 
 
+    #max
 
-Z = [ rv.pdf([xp, yp])   for yp in y for xp in x]
 
-
-fig, ax = plt.subplots()
-Z = np.reshape(Z, (100,100))
-ax.imshow(Z)
+    #Find outpoint
 
 
 
-ax.scatter( len(x)/2+ mu[0]*len(x)/2, len(x)/2+ mu[1]*len(x)/2)
-ax.scatter( len(x)/2+ point[0]*len(x)/2, len(x)/2+ point[1]*len(x)/2)
-plt.show()
+
+
+    Z = [ rv.pdf([xp, yp])   for yp in y for xp in x]
+
+
+    fig, ax = plt.subplots()
+    Z = np.reshape(Z, (100,100))
+    ax.imshow(Z)
+
+
+
+    ax.scatter( len(x)/2+ mu[0]*len(x)/2, len(x)/2+ mu[1]*len(x)/2)
+    ax.scatter( len(x)/2+ point[0]*len(x)/2, len(x)/2+ point[1]*len(x)/2)
+    plt.show()
 
 
 

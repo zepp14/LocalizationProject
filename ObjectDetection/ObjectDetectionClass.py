@@ -2,13 +2,14 @@ import cv2 as cv
 import numpy as np
 import os
 from sklearn.cluster import KMeans
-
+from statstests import StatCompute
 
 class BodyObject(object):
     def __init__(self):
         self.Position_Estimate = None
         self.Velocity_Estimate = None
-
+        self.MeasurementCount = 0
+        self.NewMeasurements = []
         self.GuessedDangerClass = None
 
 class ObjectTracker(object):
@@ -32,7 +33,9 @@ class ObjectTracker(object):
 
         self.maskedOF = None
 
-        self.TrackedBodies = []
+        self.PrevTrackedBodies = []
+        self.CurrTrackedBodies = []
+        self.TestedTrackedBodies = []
 
         #contours
         self.ContourList = None
@@ -51,6 +54,7 @@ class ObjectTracker(object):
         self.OF_BitMask_Curr = zeroArray
 
         self.OF_BitMask_Prev = self.OF_BitMask_Curr
+        self.OpticalFlowFrameGen()
        
 
 
@@ -117,10 +121,11 @@ class ObjectTracker(object):
         #cv.drawContours(self.CurrentFrame, contours, -1, (0,255,0), 3)
         self.getOF_states()
         self.getContourCentroid()
-        self.getClustering()
+        #self.getClustering()
         if self.mode == 0:
+            pass
             self.InitializtionMode()
-            print(self.TrackedBodies)
+            
     
     #Optical Flow Algo and Mask Gen
     def getOF_states(self):
@@ -146,12 +151,33 @@ class ObjectTracker(object):
         self.CentroidPoints = Centers
 
     def InitializtionMode(self):
-        self.TrackedBodies = []
+        self.CurrTrackedBodies = []
         for c in self.CentroidPoints:
             c_int = np.int64(c)
             BodyTemp = BodyObject()
             BodyTemp.Position_Estimate = np.array(c_int)
-            self.TrackedBodies.append(BodyTemp)
+            self.CurrTrackedBodies.append(BodyTemp)
+
+        if(len(self.PrevTrackedBodies)>0):
+            for Body in self.PrevTrackedBodies:
+                mu = Body.Position_Estimate
+                covar = np.array([[20.0, 0],[0, 20.0]])
+                sc = StatCompute(np.float32(mu),covar)
+
+                for NewBod in self.CurrTrackedBodies:
+                    point = NewBod.Position_Estimate
+                    Pvalue = sc.computePseudoPValue(np.float32(point))
+                    alph = (1 - 0.85)/2
+                    print(Pvalue )
+                    if Pvalue <= alph:
+                        cv.circle(self.CurrentFrame, ((mu[0],mu[1])), 5, (255, 0, 255), -1)
+                        Body.NewMeasurements.append(NewBod)
+                        Body.MeasurementCount += 1
+                        pass
+    
+
+        self.PrevTrackedBodies = self.CurrTrackedBodies
+
 
     def getClustering(self):
 
@@ -162,7 +188,7 @@ class ObjectTracker(object):
             for c in ClusterCenters :
                 c_int = np.int64(c)
                 cv.circle(self.CurrentFrame, (c_int[0],c_int[1]), 5, (255, 0, 255), -1)
-            print( ClusterCenters)
+            
         else:
             for c in self.CentroidPoints :
                 c_int = np.int64(c)
@@ -175,7 +201,7 @@ if __name__ == "__main__":
 
     tracker = ObjectTracker()
    
-    vidName = '\LightOn.mp4'
+    vidName = '\LightOff.mp4'
     PathPre = os.path.dirname(__file__) + vidName
     
     vid = cv.VideoCapture(PathPre)
