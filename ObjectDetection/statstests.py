@@ -14,19 +14,20 @@ class StatCompute(object):
         self.MaxPVal = None
         self.alphVal = (1.- conf_lvl)/2.
 
-        testPoint = np.array([mu[0] + 1e-7, mu[1] + 1e-7])
-        DiffVec = (testPoint - self.mu) / np.linalg.norm((testPoint -self.mu))
-        scalar = np.linspace(0., 1., 300)
+        testPoint = np.array([mu[0] + 1e-10, mu[1] + 1e-10])
+        DiffVec = (testPoint - self.mu) / np.linalg.norm((testPoint - self.mu))
+        scalar = np.linspace(0., 1., 350)
         Array = [ testPoint + p*6.0*self.covar[0,0]* DiffVec   for p in scalar ]
         stat = self.StatFunc.pdf(Array)
         self.MaxPVal = np.trapz(stat)
         
 
     def computePseudoPValue(self, point):
+        #print(self.MaxPVal )
         testPoint = point
         DiffVec = (testPoint - self.mu) / np.linalg.norm((testPoint -self.mu))
-        scalar = np.linspace(0., 1., 300)
-        Array = [ testPoint + p*6.0*np.sqrt(self.covar[0,0])* DiffVec   for p in scalar ]
+        scalar = np.linspace(0., 1., 350)
+        Array = [ testPoint + p*6.0*(self.covar[0,0])* DiffVec   for p in scalar ]
         stat = self.StatFunc.pdf(Array)
         
         return 1-(np.trapz(stat)/self.MaxPVal)
@@ -39,7 +40,7 @@ if __name__ == "__main__":
     sc = StatCompute(mu,covar)
 
 
-    point = np.array([0.03,-0.03])
+    point = np.array([0.00,-0.00])
     out = sc.computePseudoPValue( point)
     print("output ", out)
 

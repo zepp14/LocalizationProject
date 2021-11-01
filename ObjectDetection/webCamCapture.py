@@ -2,6 +2,7 @@
 import cv2 as cv
 import numpy as np
 import os
+from TrackingAlgorithmObj import update_track
   
 # define a video capture object
 #vid = cv.VideoCapture(0)

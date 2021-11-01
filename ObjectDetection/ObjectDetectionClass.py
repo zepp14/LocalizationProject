@@ -1,9 +1,11 @@
 import cv2 as cv
+import cv2 as cv2
 import numpy as np
 import os
 from sklearn.cluster import KMeans
 from statstests import StatCompute
-
+import time
+from TrackingAlgorithmObj import update_track
 class BodyObject(object):
     def __init__(self):
         self.Position_Estimate = None
@@ -15,6 +17,11 @@ class BodyObject(object):
 class ObjectTracker(object):
     def __init__(self):
         # Initialized Frames
+
+        self.initTime = time.time()
+        self.currentTime = time.time()
+        self.PrevTime = time.time()
+
         self.GrayCurrentFrame = None
         self.GrayPreviousFrame = None
 
@@ -44,6 +51,7 @@ class ObjectTracker(object):
         self.mode = 0
 
     def firstFrameRet(self, frame):
+        self.initTime = time.time()
         self.CurrentFrame = frame
         self.PreviousFrame =  frame
 
@@ -55,6 +63,7 @@ class ObjectTracker(object):
 
         self.OF_BitMask_Prev = self.OF_BitMask_Curr
         self.OpticalFlowFrameGen()
+        self.PrevTime = time.time()
        
 
 
@@ -80,6 +89,7 @@ class ObjectTracker(object):
 
     #Optical Flow Algo and Mask Gen
     def OpticalFlowFrameGen(self):
+        self.CurrTime = time.time()
         prev = self.GrayPreviousFrame
         curr = self.GrayCurrentFrame
         sz = np.shape(prev )
@@ -88,7 +98,7 @@ class ObjectTracker(object):
                                     0.5, 10, 10, 1, 5, 1.2, 0)
         magnitude, angle = cv.cartToPolar(flow[..., 0], flow[..., 1])
 
-
+        self.flow = flow
         
         mask = cv.normalize(magnitude, None, 0, 255, cv.NORM_MINMAX)
 
@@ -121,11 +131,12 @@ class ObjectTracker(object):
         #cv.drawContours(self.CurrentFrame, contours, -1, (0,255,0), 3)
         self.getOF_states()
         self.getContourCentroid()
-        #self.getClustering()
+        
         if self.mode == 0:
             pass
+            self.deltaT = self.CurrTime - self.PrevTime
             self.InitializtionMode()
-            
+        self.PrevTime = self.CurrTime 
     
     #Optical Flow Algo and Mask Gen
     def getOF_states(self):
@@ -151,32 +162,48 @@ class ObjectTracker(object):
         self.CentroidPoints = Centers
 
     def InitializtionMode(self):
-        self.CurrTrackedBodies = []
+        
+        self.CurrObs = []
         for c in self.CentroidPoints:
-            c_int = np.int64(c)
+            c_int = np.float64(c)
             BodyTemp = BodyObject()
             BodyTemp.Position_Estimate = np.array(c_int)
-            self.CurrTrackedBodies.append(BodyTemp)
+            
+            BodyTemp.Velocity_Estimate = [self.flow[c[1],c[0],0],self.flow[c[1],c[0],1]] 
+            self.CurrObs.append(BodyTemp)
 
-        if(len(self.PrevTrackedBodies)>0):
-            for Body in self.PrevTrackedBodies:
-                mu = Body.Position_Estimate
-                covar = np.array([[20.0, 0],[0, 20.0]])
-                sc = StatCompute(np.float32(mu),covar)
+        
+        covariance = np.array([[170., 0],[0, 170.]])
+        _,_,_  = update_track(self.CurrObs , self.PrevTrackedBodies, self.TestedTrackedBodies , covariance)
+        d  = [n.MeasurementCount for n in self.TestedTrackedBodies]
+        
+        for p in self.TestedTrackedBodies:
+            if p.MeasurementCount > 50:
+                print(p.MeasurementCount )
+                cent = (np.int32(p.Position_Estimate[0]),np.int32(p.Position_Estimate[1]))
+                cent2 = (np.int32(p.Position_Estimate[0]) + 5*np.int32(p.Velocity_Estimate[0]) ,np.int32(p.Position_Estimate[1]) + 5*np.int32(p.Velocity_Estimate[1]))
+                p.Position_Estimate = np.float64(p.Position_Estimate) + self.deltaT * np.float64(p.Velocity_Estimate)
+                
+                cv.circle(self.CurrentFrame,  cent, 5, (100, 0, 255), -1)
+                cv.rectangle(self.CurrentFrame, (cent[0]-30,cent[1]-30), (cent[0]+30,cent[1]+30), (255,0,0), 2)
+                cv.line(self.CurrentFrame,  cent,  cent2 , (255,255,0))
+            else:
+                
+                cent = (np.int32(p.Position_Estimate[0]),np.int32(p.Position_Estimate[1]))
+                cent2 = (np.int32(p.Position_Estimate[0]) + 5*np.int32(p.Velocity_Estimate[0]) ,np.int32(p.Position_Estimate[1]) + 5*np.int32(p.Velocity_Estimate[1]))
+                p.Position_Estimate = np.float64(p.Position_Estimate) + self.deltaT * np.float64(p.Velocity_Estimate)
+                
+                cv.circle(self.CurrentFrame,  cent, 5, (100, 0, 255), -1)
+                #cv.rectangle(self.CurrentFrame, (cent[0]-30,cent[1]-30), (cent[0]+30,cent[1]+30), (255,0,0), 2)
+                cv.line(self.CurrentFrame,  cent,  cent2 , (255,255,0))
 
-                for NewBod in self.CurrTrackedBodies:
-                    point = NewBod.Position_Estimate
-                    Pvalue = sc.computePseudoPValue(np.float32(point))
-                    alph = (1 - 0.85)/2
-                    print(Pvalue )
-                    if Pvalue <= alph:
-                        cv.circle(self.CurrentFrame, ((mu[0],mu[1])), 5, (255, 0, 255), -1)
-                        Body.NewMeasurements.append(NewBod)
-                        Body.MeasurementCount += 1
-                        pass
-    
+            pass
 
-        self.PrevTrackedBodies = self.CurrTrackedBodies
+        # for p in self.PrevTrackedBodies:
+        #     cv.circle(self.CurrentFrame, (np.int32(p.Position_Estimate[0]),np.int32(p.Position_Estimate[1])), 5, (255, 0, 100), -1)
+        #     pass
+
+        self.PrevTrackedBodies = self.CurrObs
 
 
     def getClustering(self):
@@ -205,6 +232,7 @@ if __name__ == "__main__":
     PathPre = os.path.dirname(__file__) + vidName
     
     vid = cv.VideoCapture(PathPre)
+    #vid = cv.VideoCapture(0)
     ret, first_frame = vid.read()
     tracker.firstFrameRet(first_frame)
 
@@ -222,7 +250,10 @@ if __name__ == "__main__":
     #plt.xlabel("X",fontsize=18)
     #plt.ylabel("sinX",fontsize=18)
     p = 0
-    
+    sz = np.shape(first_frame)
+   
+   
+    out = cv.VideoWriter('output.avi', -1, cv2.VideoWriter_fourcc(*'MP4V'), (sz[0], sz[1]))
     while(True):
         #try:
             ret, frame = vid.read()
@@ -232,6 +263,7 @@ if __name__ == "__main__":
             cv.imshow('ColorImage', tracker.CurrentFrame)
             cv.imshow('GrayBlurrImage', tracker.GrayCurrentFrame)
             cv.imshow('OF_Mask_Comb', tracker.OF_BitMask_Curr)
+            out.write(tracker.CurrentFrame)
             #cv.imshow('Diff', tracker.getFrameDifference())
             
             #updated_y = np.cos(x-0.05*p)
@@ -254,6 +286,7 @@ if __name__ == "__main__":
             #break
     
     # After the loop release the cap object
+    out.release()
     vid.release()
     # Destroy all the windows
     cv.destroyAllWindows() 
