@@ -173,7 +173,7 @@ class ObjectTracker(object):
             self.CurrObs.append(BodyTemp)
 
         
-        covariance = np.array([[170., 0],[0, 170.]])
+        covariance = np.array([[70., 0],[0, 70.]])
         _,_,_  = update_track(self.CurrObs , self.PrevTrackedBodies, self.TestedTrackedBodies , covariance)
         d  = [n.MeasurementCount for n in self.TestedTrackedBodies]
         
@@ -228,7 +228,7 @@ if __name__ == "__main__":
 
     tracker = ObjectTracker()
    
-    vidName = '\LightOff.mp4'
+    vidName = '\LightOn.mp4'
     PathPre = os.path.dirname(__file__) + vidName
     
     vid = cv.VideoCapture(PathPre)
@@ -263,7 +263,7 @@ if __name__ == "__main__":
             cv.imshow('ColorImage', tracker.CurrentFrame)
             cv.imshow('GrayBlurrImage', tracker.GrayCurrentFrame)
             cv.imshow('OF_Mask_Comb', tracker.OF_BitMask_Curr)
-            out.write(tracker.CurrentFrame)
+            #out.write(tracker.CurrentFrame)
             #cv.imshow('Diff', tracker.getFrameDifference())
             
             #updated_y = np.cos(x-0.05*p)
